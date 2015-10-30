@@ -22,6 +22,8 @@ import org.cytoscape.work.undo.UndoSupport;
  */
 public class CLLayoutTask extends AbstractParallelPartitionLayoutTask 
 {		
+	private volatile Object sync = new Object();
+	
 	private final CLLayoutContext context;
 	
 	private final CyCLDevice device;
@@ -138,88 +140,91 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 
 		public void doLayout(LayoutPartition part) 
 		{
-			long startTime = System.currentTimeMillis();
-			
-			// Init positions to random or their current values
-			if (context.fromScratch)
+			synchronized (sync)
 			{
-				Random rand = new Random(123);
-				List<LayoutNode> nodeList = part.getNodeList();
+				long startTime = System.currentTimeMillis();
 				
-				for (LayoutNode node : nodeList)
+				// Init positions to random or their current values
+				if (context.fromScratch)
 				{
-					node.setX((rand.nextFloat() - 0.5f) * 2f);
-					node.setY((rand.nextFloat() - 0.5f) * 2f);
+					Random rand = new Random(123);
+					List<LayoutNode> nodeList = part.getNodeList();
+					
+					for (LayoutNode node : nodeList)
+					{
+						node.setX((rand.nextFloat() - 0.5f) * 2f);
+						node.setY((rand.nextFloat() - 0.5f) * 2f);
+					}
 				}
-			}
-			
-			// Calculate our edge weights
-			part.calculateEdgeWeights();
-			
-			SlimNetwork slim = new SlimNetwork(part, 
-											   context.isDeterministic, 
-											   (float)context.defaultNodeMass, 
-											   (float)context.defaultSpringCoefficient, 
-											   (float)context.defaultSpringLength, 
-											   edgeWeighter, 
-											   requiredPadding);
-			
-			initializeBuffers(slim);
-			
-			if (taskMonitor != null)
-				taskMonitor.setStatusMessage("Moving partition " + part.getPartitionNumber());
-			
-			// Initialize velocity to 0
-			initializeSimulation(slim);
-			
-			// Perform layout
-			float timestep = 1000f;
-			for (int i = 0; i < context.numIterations && !cancelled; i++) 
-			{
-				// Gradually decrease time step as simulation converges
-				float decrease = (1f - (float)i / (float)context.numIterations);
-				timestep *= decrease;
-				float step = timestep + 50f;
-
-				advanceSimulation(step, false, slim);
-			}
-	
-			if (context.numIterationsEdgeRepulsive > 0)
-			{
+				
+				// Calculate our edge weights
+				part.calculateEdgeWeights();
+				
+				SlimNetwork slim = new SlimNetwork(part, 
+												   context.isDeterministic, 
+												   (float)context.defaultNodeMass, 
+												   (float)context.defaultSpringCoefficient, 
+												   (float)context.defaultSpringLength, 
+												   edgeWeighter, 
+												   requiredPadding);
+				
+				initializeBuffers(slim);
+				
+				if (taskMonitor != null)
+					taskMonitor.setStatusMessage("Moving partition " + part.getPartitionNumber());
+				
+				// Initialize velocity to 0
 				initializeSimulation(slim);
 				
-				timestep = 10f;
-				for (int i = 0; i < context.numIterationsEdgeRepulsive && !cancelled; i++) 
+				// Perform layout
+				float timestep = 1000f;
+				for (int i = 0; i < context.numIterations && !cancelled; i++) 
 				{
 					// Gradually decrease time step as simulation converges
 					float decrease = (1f - (float)i / (float)context.numIterations);
 					timestep *= decrease;
-					
-					advanceSimulation(0.25f, true, slim);
+					float step = timestep + 50f;
+	
+					advanceSimulation(step, false, slim);
 				}
-			}
-			
-			// Get positions back from CL device
-			getPositions(slim);
-			
-			long stopTime = System.currentTimeMillis();
-			//System.out.println(stopTime - startTime);
-			
-			// Update positions
-			part.resetNodes(); // reset the nodes so we get the new average location
-			for (LayoutNode ln: part.getNodeList())
-			{
-				if (!ln.isLocked()) 
+		
+				if (context.numIterationsEdgeRepulsive > 0)
 				{
-					int id = slim.nodeToIndex.get(ln);
-					ln.setX(slim.nodePosX[id]);
-					ln.setY(slim.nodePosY[id]);
-					part.moveNodeToLocation(ln);
+					initializeSimulation(slim);
+					
+					timestep = 10f;
+					for (int i = 0; i < context.numIterationsEdgeRepulsive && !cancelled; i++) 
+					{
+						// Gradually decrease time step as simulation converges
+						float decrease = (1f - (float)i / (float)context.numIterations);
+						timestep *= decrease;
+						
+						advanceSimulation(0.25f, true, slim);
+					}
 				}
+				
+				// Get positions back from CL device
+				getPositions(slim);
+				
+				long stopTime = System.currentTimeMillis();
+				//System.out.println(stopTime - startTime);
+				
+				// Update positions
+				part.resetNodes(); // reset the nodes so we get the new average location
+				for (LayoutNode ln: part.getNodeList())
+				{
+					if (!ln.isLocked()) 
+					{
+						int id = slim.nodeToIndex.get(ln);
+						ln.setX(slim.nodePosX[id]);
+						ln.setY(slim.nodePosY[id]);
+						part.moveNodeToLocation(ln);
+					}
+				}
+				
+				// Release all CLBuffers
+				freeBuffers();
 			}
-			
-			// Release all CLBuffers
-			freeBuffers();
 		}
 	
 		/***
