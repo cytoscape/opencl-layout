@@ -18,6 +18,43 @@
 	<name>OpenCL Prefuse Layout</name>
 
 	<packaging>bundle</packaging>
+	
+	<distributionManagement>
+		<repository>
+			<id>releases</id>
+			<name>Internal Releases</name>
+			<url>http://code.cytoscape.org/nexus/content/repositories/releases</url>
+		</repository>
+		<snapshotRepository>
+			<id>snapshots</id>
+			<name>Internal Snapshots</name>
+			<url>http://code.cytoscape.org/nexus/content/repositories/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+	
+	<!-- Links to the Cytoscape Maven repositories. -->
+	<repositories>
+		<repository>
+			<id>cytoscape_snapshots</id>
+			<snapshots>
+			</snapshots>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<name>Cytoscape Snapshots</name>
+			<url>http://code.cytoscape.org/nexus/content/repositories/snapshots/</url>
+		</repository>
+		<repository>
+			<id>cytoscape_releases</id>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<releases>
+			</releases>
+			<name>Cytoscape Releases</name>
+			<url>http://code.cytoscape.org/nexus/content/repositories/releases/</url>
+		</repository>
+	</repositories>
 
 	<build>
 		<!--directory>C:\Users\dtegunov\CytoscapeConfiguration\3\apps\installed\</directory -->
@@ -67,30 +104,6 @@
 			</plugin>
 		</plugins>
 	</build>
-
-	<!-- Links to the Cytoscape Maven repositories. -->
-	<repositories>
-		<repository>
-			<id>cytoscape_snapshots</id>
-			<snapshots>
-			</snapshots>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<name>Cytoscape Snapshots</name>
-			<url>http://code.cytoscape.org/nexus/content/repositories/snapshots/</url>
-		</repository>
-		<repository>
-			<id>cytoscape_releases</id>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<releases>
-			</releases>
-			<name>Cytoscape Releases</name>
-			<url>http://code.cytoscape.org/nexus/content/repositories/releases/</url>
-		</repository>
-	</repositories>
 
 	<!-- Dependencies needed to compile this project. -->
 	<dependencies>
