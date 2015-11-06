@@ -23,10 +23,10 @@ public class CyActivator extends AbstractCyActivator
 	public void start(BundleContext bc) 
 	{		
 		// Don't initialize if there are no OpenCL devices.
-		if (CyCL.getDevices().size() == 0)
-			return;
+		//if (CyCL.getDevices().size() == 0)
+			//return;
 		
-		UndoSupport undo = getService(bc,UndoSupport.class);
+		UndoSupport undo = getService(bc, UndoSupport.class);
 
 		CLLayout forceDirectedCLLayout = new CLLayout(undo);
 
