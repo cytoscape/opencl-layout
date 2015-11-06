@@ -6,7 +6,9 @@ import static org.cytoscape.work.ServiceProperties.TITLE;
 
 import java.util.Properties;
 
+import org.cytoscape.application.CyApplicationConfiguration;
 import org.cytoscape.opencl.cycl.CyCL;
+import org.cytoscape.property.CyProperty;
 import org.cytoscape.service.util.AbstractCyActivator;
 import org.cytoscape.view.layout.CyLayoutAlgorithm;
 import org.cytoscape.work.ServiceProperties;
@@ -22,9 +24,14 @@ public class CyActivator extends AbstractCyActivator
 
 	public void start(BundleContext bc) 
 	{		
+		CyApplicationConfiguration applicationConfig = getService(bc, CyApplicationConfiguration.class);	
+		CyProperty<Properties> cyPropertyServiceRef = getService(bc, CyProperty.class, "(cyPropertyName=cytoscape3.props)");
+		
+		CyCL.initialize(applicationConfig, cyPropertyServiceRef);
+		
 		// Don't initialize if there are no OpenCL devices.
-		//if (CyCL.getDevices().size() == 0)
-			//return;
+		if (CyCL.getDevices().size() == 0)
+			return;
 		
 		UndoSupport undo = getService(bc, UndoSupport.class);
 

@@ -56,7 +56,7 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 			throw new RuntimeException();
 		}
 		
-		System.out.println("Layout will use " + device.name + ".");
+		//System.out.println("Layout will use " + device.name + ".");
 		
 		String[] kernelNames = new String[] 
 				{
