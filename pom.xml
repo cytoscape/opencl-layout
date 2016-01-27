@@ -8,12 +8,13 @@
 
 		<maven-compiler-plugin.version>3.3</maven-compiler-plugin.version>
 		<maven-bundle-plugin.version>2.5.4</maven-bundle-plugin.version>
+		<cytoscape.api.version>3.3.0</cytoscape.api.version>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.cytoscape</groupId>
 	<artifactId>opencl-layout</artifactId>
-	<version>3.4.0-SNAPSHOT</version>
+	<version>3.3.1</version>
 
 	<name>OpenCL Prefuse Layout</name>
 
@@ -116,22 +117,22 @@
 		<dependency>
 			<groupId>org.cytoscape</groupId>
 			<artifactId>service-api</artifactId>
-			<version>${project.version}</version>
+			<version>${cytoscape.api.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.cytoscape</groupId>
 			<artifactId>swing-application-api</artifactId>
-			<version>${project.version}</version>
+			<version>${cytoscape.api.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.cytoscape</groupId>
 			<artifactId>session-api</artifactId>
-			<version>${project.version}</version>
+			<version>${cytoscape.api.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.cytoscape</groupId>
 			<artifactId>layout-api</artifactId>
-			<version>${project.version}</version>
+			<version>${cytoscape.api.version}</version>
 		</dependency>
 
 		<!-- Logging -->
