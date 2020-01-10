@@ -6,15 +6,16 @@
 		<bundle.symbolicName>org.cytoscape.opencl-layout</bundle.symbolicName>
 		<bundle.namespace>org.cytoscape.opencl.layout</bundle.namespace>
 
-		<maven-compiler-plugin.version>3.3</maven-compiler-plugin.version>
-		<maven-bundle-plugin.version>2.5.4</maven-bundle-plugin.version>
-		<cytoscape.api.version>3.3.0</cytoscape.api.version>
+		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+		<maven-surefire-plugin.version>3.0.0-M3</maven-surefire-plugin.version>
+		<maven-bundle-plugin.version>4.1.0</maven-bundle-plugin.version>
+		<cytoscape.api.version>3.8.0-SNAPSHOT</cytoscape.api.version>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.cytoscape</groupId>
 	<artifactId>opencl-layout</artifactId>
-	<version>3.5.0</version>
+	<version>3.6.0</version>
 
 	<name>OpenCL Prefuse Layout</name>
 
@@ -69,8 +70,8 @@
 				<version>${maven-compiler-plugin.version}</version>
 				<extensions>true</extensions>
 				<configuration>
-					<source>1.8</source>
-					<target>1.8</target>
+					<source>11</source>
+					<target>11</target>
 					<encoding>UTF-8</encoding>
 					<optimize>true</optimize>
 					<showWarnings>true</showWarnings>
@@ -84,7 +85,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>2.7.1</version>
+				<version>${maven-surefire-plugin.version}</version>
 				<configuration>
 					<redirectTestOutputToFile>true</redirectTestOutputToFile>
 				</configuration>
