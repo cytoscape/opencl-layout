@@ -15,7 +15,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.cytoscape</groupId>
 	<artifactId>opencl-layout</artifactId>
-	<version>3.6.0</version>
+	<version>3.6.0-SNAPSHOT</version>
 
 	<name>OpenCL Prefuse Layout</name>
 
