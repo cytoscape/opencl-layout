@@ -15,7 +15,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.cytoscape</groupId>
 	<artifactId>opencl-layout</artifactId>
-	<version>3.6.1</version>
+	<version>3.10.0</version>
 
 	<name>OpenCL Prefuse Layout</name>
 
@@ -142,7 +142,7 @@
 		<dependency>
 			<groupId>org.ops4j.pax.logging</groupId>
 			<artifactId>pax-logging-api</artifactId>
-			<version>1.5.2</version>
+			<version>1.11.12</version>
 			<scope>provided</scope>
 		</dependency>
 

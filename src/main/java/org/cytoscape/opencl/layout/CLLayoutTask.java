@@ -5,7 +5,12 @@ import java.util.Random;
 import java.util.Set;
 
 import org.cytoscape.model.CyNode;
-import org.cytoscape.opencl.cycl.*;
+// import org.cytoscape.opencl.cycl.*;
+import org.cytoscape.opencl.cycl.CyCL;
+import org.cytoscape.opencl.cycl.CyCLBuffer;
+import org.cytoscape.opencl.cycl.CyCLDevice;
+import org.cytoscape.opencl.cycl.CyCLLocalSize;
+import org.cytoscape.opencl.cycl.CyCLProgram;
 import org.cytoscape.opencl.cycl.CyCLDevice.DeviceTypes;
 import org.cytoscape.view.layout.AbstractParallelPartitionLayoutTask;
 import org.cytoscape.view.layout.LayoutNode;
@@ -405,7 +410,7 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 				long[] dimsLocalSpring = device.type == DeviceTypes.GPU ? new long[] { 16, device.bestBlockSize / 16 } : new long[] { 1 };
 				long[] dimsGlobalSpring = device.type == DeviceTypes.GPU ? new long[]{ 16, nextMultipleOf(slim.numNodes, dimsLocalSpring[1]) } : new long[] { slim.numNodes };
 		
-				if (device.type == DeviceTypes.GPU)
+				if (device.type == DeviceTypes.GPU) {
 					program.getKernel("CalcForcesGravity").execute(dimsGlobalGravity, dimsLocalGravity,
 						    new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4),
 						    bufferNodePosX, bufferNodePosY,
@@ -413,7 +418,7 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 						    bufferForce,
 						    slim.numNodes,
 						    slim.numNodesPadded);
-				else
+        } else
 					program.getKernel("CalcForcesGravity").execute(dimsGlobalGravity, dimsLocalGravity,
 						    bufferNodePosX, bufferNodePosY,
 						    bufferNodeMass,
