@@ -4,35 +4,35 @@ __kernel void Init(__global float2* nodeVelocity,
     int id = get_global_id(0);
     if (id >= n)
         return;
-    
+
     nodeVelocity[id] = (float2)(0.0f, 0.0f);
 }
 
 // Calculates the gravity force between two nodes.
 // Gravity constant is premultiplied in mass1.
 #ifdef CYCL_GPU
-float2 calcGravity(float2 pos1, float2 pos2, float mass1, float mass2, float2 force)
+static float2 calcGravity(float2 pos1, float2 pos2, float mass1, float mass2, float2 force)
 {
     float2 diff = (float2)(pos1.x - pos2.x, pos1.y - pos2.y);
-    
+
     float dist = rsqrt(diff.x * diff.x + diff.y * diff.y + 1e-6f);  // rsqrt is much faster than 1 / sqrt
     dist = dist * dist * dist;                              // 3rd power to normalize diff vector
-    
+
     float v = mass1 * mass2 * dist;
-    
+
     // Equivalent of force + diff * v
     return (float2)(fma(diff.x, v, force.x), fma(diff.y, v, force.y));
 }
 #else
-float16 calcGravity(float2 pos1, float8 pos2x, float8 pos2y, float8 mass2, float16 force)
+static float16 calcGravity(float2 pos1, float8 pos2x, float8 pos2y, float8 mass2, float16 force)
 {
     float8 diffx = pos1.x - pos2x;
 		float8 diffy = pos1.y - pos2y;
-	
+
     float8 dist = rsqrt(diffx * diffx + diffy * diffy + 1e-6f);
-    
+
     float8 v = dist * dist * dist * mass2;		// 3rd power to normalize diff vector
-    
+
     // Equivalent of force + diff * v
     return fma((float16)(diffx, diffy), (float16)(v, v), force);
 }
@@ -52,7 +52,7 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
     unsigned int id1 = get_global_id(0);
     unsigned int localId = get_local_id(0);
     unsigned int groupSize = get_local_size(0);
-    
+
     // Get data for the current node
     float2 node1;
     float mass1;
@@ -62,7 +62,7 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
         mass1 = nodeMass[id1];
     }
     float2 force = (float2)(0, 0);
-    
+
     // Iterate over all nodes for (anti)gravity force
     unsigned int lastPreloaded = 0;
     while (lastPreloaded < n)
@@ -77,7 +77,7 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
             s_mass[localId] = nodeMass[globalId];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-        
+
         // Using the preloaded data in local memory, calculate
         // interactions and update the force value.
         if (id1 < n)
@@ -95,7 +95,7 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
-                
+
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
@@ -104,8 +104,8 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
-                
-                
+
+
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
@@ -114,7 +114,7 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
-                
+
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
                 id2++;
                 force = calcGravity(node1, POS(id2), mass1, MASS(id2), force);
@@ -125,13 +125,13 @@ __kernel void CalcForcesGravity(__local float* s_posX, __local float* s_posY, __
                 id2++;
             }
         }
-        
+
         lastPreloaded += groupSize;
         barrier(CLK_LOCAL_MEM_FENCE);
         // Synchronization is performed at the end as well, to ensure no preload
         // operation overwrites a value another thread might still need.
     }
-    
+
     if (id1 < n)
         nodeForce[id1] = force;
 }
@@ -147,32 +147,32 @@ __kernel void CalcForcesGravity(__global float8* nodePosX, __global float8* node
 		unsigned int id1 = get_global_id(0);
 		if (id1 >= n)
 				return;
-	
+
 		// Get data for the current node
 		float2 pos1x = ((__global float2*)nodePosX)[id1], pos1y = ((__global float2*)nodePosY)[id1];
 		float16 f0 = (float16)(0.0f);
 		float16 f1 = (float16)(0.0f);
-		
+
 		// Iterate over all nodes for (anti)gravity force
 		unsigned int id2 = 0;
 		unsigned int n8 = n / 4;
 		while (id2 < n8)
 		{
 			  float8 pos2x = nodePosX[id2], pos2y = nodePosY[id2];
-			  float8 mass2 = nodeMass[id2];			
+			  float8 mass2 = nodeMass[id2];
 				f0 = calcGravity((float2)(pos1x.s0, pos1y.s0), pos2x, pos2y, mass2, f0);
-				f1 = calcGravity((float2)(pos1x.s1, pos1y.s1), pos2x, pos2y, mass2, f1);			
+				f1 = calcGravity((float2)(pos1x.s1, pos1y.s1), pos2x, pos2y, mass2, f1);
 				id2++;
-			
+
 			  pos2x = nodePosX[id2], pos2y = nodePosY[id2];
-			  mass2 = nodeMass[id2];			
+			  mass2 = nodeMass[id2];
 				f0 = calcGravity((float2)(pos1x.s0, pos1y.s0), pos2x, pos2y, mass2, f0);
-				f1 = calcGravity((float2)(pos1x.s1, pos1y.s1), pos2x, pos2y, mass2, f1);			
+				f1 = calcGravity((float2)(pos1x.s1, pos1y.s1), pos2x, pos2y, mass2, f1);
 				id2++;
 		}
-		
+
 		float2 mass1 = ((__global float2*)nodeMass)[id1];
-		
+
 		nodeForce[id1 * 2 + 0] = REDUCE16TO2(f0) * mass1.s0;
 		nodeForce[id1 * 2 + 1] = REDUCE16TO2(f1) * mass1.s1;
 }
@@ -190,10 +190,10 @@ __kernel void PrepareEdgeRepulsion(__global float* nodePosX, __global float* nod
         unsigned int source = edgeSource[id], target = edgeTarget[id];
         float2 sourcePos = (float2)(nodePosX[source], nodePosY[source]);
         float2 targetPos = (float2)(nodePosX[target], nodePosY[target]);
-        
+
         edgeStartX[id] = sourcePos.x;
         edgeStartY[id] = sourcePos.y;
-        
+
         float2 tangent = (float2)(targetPos.x - sourcePos.x, targetPos.y - sourcePos.y);
         float length = hypot(tangent.x, tangent.y);
         edgeLength[id] = length;
@@ -205,27 +205,27 @@ __kernel void PrepareEdgeRepulsion(__global float* nodePosX, __global float* nod
 }
 
 // Calculates interaction between a node and its closest point on an edge
-float2 calcEdgeRepulsion (float2 pos1, float mass1, float2 edgePos, float2 edgeTangent, float edgeLength, float2 edgeMass, float2 force)
+static float2 calcEdgeRepulsion (float2 pos1, float mass1, float2 edgePos, float2 edgeTangent, float edgeLength, float2 edgeMass, float2 force)
 {
     // Project the node's relative position onto the edge
     pos1 = (float2)(pos1.x - edgePos.x, pos1.y - edgePos.y);
     float parallelDist = pos1.x * edgeTangent.x + pos1.y * edgeTangent.y;   // dotp
     parallelDist = clamp(parallelDist, 0.0f, edgeLength);                   // make sure the point lies on the edge
-    
+
     float mass2 = edgeMass.x + (edgeMass.y - edgeMass.x) * (parallelDist / edgeLength);
-    
+
     float2 pos2 = edgeTangent * parallelDist;   // tangent * dotp = point on edge
     float2 diff = (float2)(pos1.x - pos2.x, pos1.y - pos2.y);
-    
+
     float dist = diff.x * diff.x + diff.y * diff.y;
     if (dist < 1e-5f)           // Either too close or own edge
         dist = 0.0f;
     else
         dist = rsqrt(max(dist, 1.0f));     // rsqrt is faster than sqrt
     dist = dist * dist * dist;  // 3rd power to normalize diff vector
-    
+
     float v = mass1 * mass2 * dist;
-    
+
     // Equivalent of force + diff * v
     return (float2)(fma(diff.x, v, force.x), fma(diff.y, v, force.y));
 }
@@ -251,7 +251,7 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
     unsigned int id1 = get_global_id(0);
     unsigned int localId = get_local_id(0);
     unsigned int groupSize = get_local_size(0);
-    
+
     // Get data for the current node
     float2 node1;
     float mass1;
@@ -261,7 +261,7 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
         mass1 = nodeMass[id1];
     }
     float2 force = (float2)(0, 0);
-    
+
     // Iterate over all nodes for (anti)gravity force
     unsigned int lastPreloaded = 0;
     while (lastPreloaded < nedges)
@@ -280,7 +280,7 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
             s_massEnd[localId] = edgeMassEnd[globalId];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-        
+
         // Using the preloaded data in local memory, calculate
         // interactions and update the force value.
         if (id1 < n)
@@ -298,7 +298,7 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
-                
+
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
@@ -307,8 +307,8 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
-                
-                
+
+
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
@@ -317,7 +317,7 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
-                
+
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
                 id2++;
                 force = calcEdgeRepulsion(node1, mass1, START(id2), TANGENT(id2), LENGTH(id2), EDGEMASS(id2), force);
@@ -328,13 +328,13 @@ __kernel void CalcForcesEdgeRepulsion(__local float* s_startX, __local float* s_
                 id2++;
             }
         }
-        
+
         lastPreloaded += groupSize;
         barrier(CLK_LOCAL_MEM_FENCE);
         // Synchronization is performed at the end as well, to ensure no preload
         // operation overwrites a value another thread might still need.
     }
-    
+
     if (id1 < n)
         nodeForce[id1] += force;
 }
@@ -355,12 +355,12 @@ __kernel void CalcForcesSpringDrag(__local float2* s_buffer,
     unsigned int id1 = get_global_id(1);
     //if (id1 >= n)
         //return;
-    
+
     // Figure out position in warp and shift s_nodeForce address to forget about other warps
     unsigned int warpSize = 16;
     unsigned int warpId = get_local_id(0);
 	s_buffer += get_local_id(1) * warpSize;
-    
+
 	if (id1 < n)
 	{
 		// Get data for the current node
@@ -390,11 +390,11 @@ __kernel void CalcForcesSpringDrag(__local float2* s_buffer,
 		// Store this thread's result in local memory
 		s_buffer[warpId] = force;
 	}
-    
+
     // On some hardware, no synchronization should be needed (warp-synchronous programming).
     // But synchronize anyway to be on the safe side.
     barrier(CLK_LOCAL_MEM_FENCE);
-    
+
     if (warpId < 8)
     {
         s_buffer[warpId] += s_buffer[warpId + 8];
@@ -413,7 +413,7 @@ __kernel void CalcForcesSpringDrag(__local float2* s_buffer,
     if (warpId == 0)
     {
         s_buffer[0] += s_buffer[1];
-                        
+
 		if (id1 < n)
 			nodeForce[id1] += s_buffer[0] - 0.01f * nodeVelocity[id1];          // Apply drag force and store overall value
     }
@@ -429,31 +429,31 @@ __kernel void CalcForcesSpringDrag(__global float* nodePosX, __global float* nod
     unsigned int id1 = get_global_id(0);
 		if (id1 >= n)
 				return;
-				
+
 		// Get data for the current node
 		float2 node1 = (float2)(nodePosX[id1], nodePosY[id1]);
 		float2 force = (float2)(0.0f, 0.0f);
-		
+
 		// Iterate over edges for spring force
 		unsigned int firstEdge = edgeOffsets[id1];
 		unsigned int lastEdge = firstEdge + edgeCounts[id1];
 		for (unsigned int e = firstEdge; e < lastEdge; e++)
 		{
 				unsigned int id2 = edges[e];
-				
+
 				float2 node2 = (float2)(nodePosX[id2], nodePosY[id2]);
-				
+
 				float2 diff = (float2)(node2.x - node1.x, node2.y - node1.y);
-				
+
 				// + 1e-8f to avoid division by zero in case of identical position.
 				float dist = hypot(diff.x, diff.y) + 1e-8f;
 				float v = edgeCoeffs[e] * (dist - edgeLengths[e]) / dist;
-				
+
 				// Equivalent of force += diff * v
 				force.x = fma(diff.x, v, force.x);
 				force.y = fma(diff.y, v, force.y);
 		}
-						
+
 		nodeForce[id1] += force - 0.01f * nodeVelocity[id1];          // Apply drag force and store overall value
 }
 #endif
@@ -472,13 +472,13 @@ __kernel void IntegrateRK0(__global float* nodePosX, __global float* nodePosY,
         return;
 
 		float mass = nodeMass[id];
-		
+
 		nodeK[3 * n + id] = (float2)(nodePosX[id], nodePosY[id]);
-		
+
 		float2 update = nodeVelocity[id] * timestep;
 		nodeK[id] = update;
 		nodeL[id] = nodeForce[id] * timestep / mass;
-		
+
 		nodePosX[id] += 0.5f * update.x;
 		nodePosY[id] += 0.5f * update.y;
 }
@@ -495,19 +495,19 @@ __kernel void IntegrateRK1(__global float* nodePosX, __global float* nodePosY,
 {
     int id = get_global_id(0);
     if (id >= n)
-        return;		
+        return;
 
 		float mass = nodeMass[id];
-		
+
 		float2 v = nodeVelocity[id] + 0.5f * nodeL[id];
 		float vmagn = length(v);
 		if (vmagn > maxVelocity)
 				v *= maxVelocity / vmagn;
-		
+
 		float2 update = v * timestep;
 		nodeK[n + id] = update;
 		nodeL[n + id] = nodeForce[id] * timestep / mass;
-		
+
 		update = nodeK[3 * n + id] + 0.5f * update;
 		nodePosX[id] = update.x;
 		nodePosY[id] = update.y;
@@ -526,18 +526,18 @@ __kernel void IntegrateRK2(__global float* nodePosX, __global float* nodePosY,
     int id = get_global_id(0);
     if (id >= n)
         return;
-		
+
 		float mass = nodeMass[id];
-		
+
 		float2 v = nodeVelocity[id] + 0.5f * nodeL[n + id];
 		float vmagn = length(v);
 		if (vmagn > maxVelocity)
 				v *= maxVelocity / vmagn;
-		
+
 		float2 update = v * timestep;
 		nodeK[2 * n + id] = update;
 		nodeL[2 * n + id] = nodeForce[id] * timestep / mass;
-		
+
 		update = nodeK[3 * n + id] + 0.5f * update;
 		nodePosX[id] = update.x;
 		nodePosY[id] = update.y;
@@ -556,26 +556,26 @@ __kernel void IntegrateRK3(__global float* nodePosX, __global float* nodePosY,
     int id = get_global_id(0);
     if (id >= n)
         return;
-		
+
 		float mass = nodeMass[id];
-		
+
 		float2 v = nodeVelocity[id] + 0.5f * nodeL[2 * n + id];
 		float vmagn = length(v);
 		if (vmagn > maxVelocity)
 				v *= maxVelocity / vmagn;
-		
+
 		float2 k3 = v * timestep;
 		float2 l3 = nodeForce[id] * timestep / mass;
-		
+
 		k3 = nodeK[3 * n + id] + (nodeK[id] + k3) / 6.0f + (nodeK[n + id] + nodeK[2 * n + id]) / 3.0f;
 		nodePosX[id] = k3.x;
 		nodePosY[id] = k3.y;
-		
+
 		v = (nodeL[id] + l3) / 6.0f + (nodeL[n + id] + nodeL[2 * n + id]) / 3.0f;
 		vmagn = length(v);
 		if (vmagn > maxVelocity)
 				v *= maxVelocity / vmagn;
-		
+
 		nodeVelocity[id] += v;
 }
 
@@ -590,19 +590,19 @@ __kernel void IntegrateEuler(__global float* nodePosX, __global float* nodePosY,
     int id = get_global_id(0);
     if (id >= n)
         return;
-		
+
 		float2 pos = (float2)(nodePosX[id], nodePosY[id]);
 		float m = nodeMass[id];
 		float2 v = nodeVelocity[id];
 		float2 f = nodeForce[id];
-		
+
 		pos += v * timestep;
-		
+
 		v += f / m * timestep;
 		float vmagn = length(v);
 		if (vmagn > maxVelocity)
 				v *= maxVelocity / vmagn;
-		
+
 		nodePosX[id] = pos.x;
 		nodePosY[id] = pos.y;
 		nodeVelocity[id] = v;

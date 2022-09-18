@@ -38,7 +38,7 @@ public class CLLayoutContext implements TunableValidator
 	
 	@Tunable(description="Iterations")
 	public int numIterations = 100;
-	@Tunable(description="Edge-Repulsive Iterations")
+	@Tunable(description="Edge-Repulsive Iterations", format="0")
 	public int numIterationsEdgeRepulsive = 0;
 	@Tunable(description="Default Spring Coefficient")
 	public double defaultSpringCoefficient = 1e-4;

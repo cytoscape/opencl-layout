@@ -61,7 +61,13 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 			throw new RuntimeException();
 		}
 		
-		//System.out.println("Layout will use " + device.name + ".");
+    if (device.type == DeviceTypes.GPU) {
+      System.out.println("Layout will use GPU " + device.name + ".");
+      System.out.println("Max work group size = "+device.maxWorkGroupSize+".");
+      System.out.println("Best block size = "+device.bestBlockSize+".");
+      System.out.println("Best warp size = "+device.bestWarpSize+".");
+    } else
+      System.out.println("Layout will use CPU " + device.name + ".");
 		
 		String[] kernelNames = new String[] 
 				{
@@ -145,6 +151,8 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 
 		public void doLayout(LayoutPartition part) 
 		{
+      // System.out.println("Partition " + part.getPartitionNumber() + ": Initializing...");
+
 			synchronized (sync)
 			{
 				long startTime = System.currentTimeMillis();
@@ -173,13 +181,19 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 												   edgeWeighter, 
 												   requiredPadding);
 				
+        long time2 = System.currentTimeMillis();
 				initializeBuffers(slim);
+        // System.out.println("Partition " + part.getPartitionNumber() + ": Took "+(System.currentTimeMillis()-time2)+"ms to init buffers");
+        
 				
 				if (taskMonitor != null)
 					taskMonitor.setStatusMessage("Moving partition " + part.getPartitionNumber());
 				
 				// Initialize velocity to 0
 				initializeSimulation(slim);
+
+        long time3 = System.currentTimeMillis();
+        // System.out.println("Partition " + part.getPartitionNumber() + ": Took "+(time3-startTime)+"ms to init");
 				
 				// Perform layout
 				float timestep = 1000f;
@@ -207,12 +221,13 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 						advanceSimulation(0.25f, true, slim);
 					}
 				}
-				
+
 				// Get positions back from CL device
 				getPositions(slim);
 				
 				long stopTime = System.currentTimeMillis();
 				//System.out.println(stopTime - startTime);
+        // System.out.println("Partition " + part.getPartitionNumber() + ": algorithm done in "+(stopTime-startTime)+"ms");
 				
 				// Update positions
 				part.resetNodes(); // reset the nodes so we get the new average location
@@ -229,6 +244,7 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 				
 				// Release all CLBuffers
 				freeBuffers();
+        // System.out.println("Partition " + part.getPartitionNumber() + ": done in "+(System.currentTimeMillis()-startTime)+"ms");
 			}
 		}
 	
@@ -293,8 +309,6 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 			
 			if (context.numIterationsEdgeRepulsive > 0)
 			{
-				bufferEdgeStartX.free();
-				bufferEdgeStartY.free();
 				bufferEdgeStartX.free();
 				bufferEdgeStartY.free();
 				bufferEdgeTangentX.free();
