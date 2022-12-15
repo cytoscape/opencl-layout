@@ -4,7 +4,8 @@ import static org.cytoscape.work.ServiceProperties.*;
 
 import java.util.Properties;
 
-import org.cytoscape.opencl.cycl.CyCL;
+import org.cytoscape.cycl.CyCLDevice;
+import org.cytoscape.cycl.CyCLFactory;
 import org.cytoscape.service.util.AbstractCyActivator;
 import org.cytoscape.view.layout.CyLayoutAlgorithm;
 import org.cytoscape.work.undo.UndoSupport;
@@ -21,22 +22,24 @@ public class CyActivator extends AbstractCyActivator {
 		registerServiceListener(bc, 
 			(cycl, props) -> initialize(bc, cycl),
 			(cycl, props) -> {}, 
-			CyCL.class);
+			CyCLFactory.class);
 	}
 	
 	
-	private void initialize(BundleContext bc, CyCL cycl) {
+	private void initialize(BundleContext bc, CyCLFactory cycl) {
 		new Thread(() -> {
 			try {
 				// Don't initialize if there are no OpenCL devices.
-				if (CyCL.getDevices().size() == 0) {
-					logger.error("No OpenCL compatible device found. Cannot register '" + CLLayout.ALGORITHM_DISPLAY_NAME + "'.");
+        if (!cycl.isInitialized()) {
+					logger.error("OpenCL did not initialize. Cannot register '" + CLLayout.ALGORITHM_DISPLAY_NAME + "'.");
 					return;
-				}
+        }
+
+        CyCLDevice device = cycl.getDevice(); // Get the best device
 				
 				UndoSupport undo = getService(bc, UndoSupport.class);
 
-				CLLayout forceDirectedCLLayout = new CLLayout(undo);
+				CLLayout forceDirectedCLLayout = new CLLayout(undo, device);
 
 		        Properties forceDirectedCLLayoutProps = new Properties();
 		        forceDirectedCLLayoutProps.setProperty(PREFERRED_MENU, "Layout.Cytoscape Layouts");

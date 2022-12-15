@@ -6,12 +6,13 @@ import java.util.Set;
 
 import org.cytoscape.model.CyNode;
 // import org.cytoscape.opencl.cycl.*;
-import org.cytoscape.opencl.cycl.CyCL;
-import org.cytoscape.opencl.cycl.CyCLBuffer;
-import org.cytoscape.opencl.cycl.CyCLDevice;
-import org.cytoscape.opencl.cycl.CyCLLocalSize;
-import org.cytoscape.opencl.cycl.CyCLProgram;
-import org.cytoscape.opencl.cycl.CyCLDevice.DeviceTypes;
+//import org.cytoscape.opencl.cycl.CyCL;
+import org.cytoscape.cycl.CyCLBuffer;
+import org.cytoscape.cycl.CyCLDevice;
+import org.cytoscape.cycl.CyCLFactory;
+import org.cytoscape.cycl.CyCLLocalSize;
+import org.cytoscape.cycl.CyCLProgram;
+import org.cytoscape.cycl.CyCLDevice.DeviceTypes;
 import org.cytoscape.view.layout.AbstractParallelPartitionLayoutTask;
 import org.cytoscape.view.layout.LayoutNode;
 import org.cytoscape.view.layout.LayoutPartition;
@@ -38,36 +39,28 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 	 * Creates a new ForceDirectedLayout object.
 	 */
 	public CLLayoutTask(final String displayName, 
-						 CyNetworkView networkView, 
-						 Set<View<CyNode>> nodesToLayOut,
+             final CyCLDevice device,
+						 final CyNetworkView networkView, 
+						 final Set<View<CyNode>> nodesToLayOut,
 						 final CLLayoutContext context,
-						 String attrName, 
-						 UndoSupport undo) 
+						 final String attrName, 
+						 final UndoSupport undo) 
 	{
 		super(displayName, context.singlePartition, networkView, nodesToLayOut, attrName, undo);
 
 		this.context = context;
+		this.device = device;
 
 		edgeWeighter = context.edgeWeighter;
 		edgeWeighter.setWeightAttribute(layoutAttribute);
 		
-		try
-		{
-			device = CyCL.getDevices().get(0);
-		}
-		catch (Exception e)
-		{
-			System.out.println("No OpenCL devices found, cannot do layout.");
-			throw new RuntimeException();
-		}
-		
-    if (device.type == DeviceTypes.GPU) {
-      System.out.println("Layout will use GPU " + device.name + ".");
-      System.out.println("Max work group size = "+device.maxWorkGroupSize+".");
-      System.out.println("Best block size = "+device.bestBlockSize+".");
-      System.out.println("Best warp size = "+device.bestWarpSize+".");
+    if (device.getType() == DeviceTypes.GPU) {
+      System.out.println("Layout will use GPU " + device.getName() + ".");
+      System.out.println("Max work group size = "+device.getMaxWorkGroupSize()+".");
+      System.out.println("Best block size = "+device.getBestBlockSize()+".");
+      System.out.println("Best warp size = "+device.getBestWarpSize()+".");
     } else
-      System.out.println("Layout will use CPU " + device.name + ".");
+      System.out.println("Layout will use CPU " + device.getName() + ".");
 		
 		String[] kernelNames = new String[] 
 				{
@@ -355,7 +348,7 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 		private void advanceSimulation(float timestep, boolean doEdgeRepulsion, SlimNetwork slim)
 		{
 			// Parallelization scheme is different for CPU and GPU kernel versions
-			long[] dimsLocal = new long[]{ device.bestBlockSize };
+			long[] dimsLocal = new long[]{ device.getBestBlockSize() };
 			long[] dimsGlobal = new long[]{ nextMultipleOf(slim.numNodes, dimsLocal[0]) };
 			
 			calculateForces(doEdgeRepulsion, slim);
@@ -417,16 +410,16 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 		private void calculateForces(boolean doEdgeRepulsion, SlimNetwork slim)
 		{
 				// Parallelization scheme is different for CPU and GPU kernel versions
-				long[] dimsLocalEdgeRepulsion = new long[] { device.bestBlockSize };
+				long[] dimsLocalEdgeRepulsion = new long[] { device.getBestBlockSize() };
 				long[] dimsGlobalEdgeRepulsion = new long[] { Math.min(65536, nextMultipleOf(slim.numEdgesUnique, dimsLocalEdgeRepulsion[0])) };
-				long[] dimsLocalGravity = new long[] { device.bestBlockSize };
-				long[] dimsGlobalGravity = new long[] { device.type == DeviceTypes.GPU ? nextMultipleOf(slim.numNodes, dimsLocalGravity[0]) : slim.numNodesPadded / 2 };
-				long[] dimsLocalSpring = device.type == DeviceTypes.GPU ? new long[] { 16, device.bestBlockSize / 16 } : new long[] { 1 };
-				long[] dimsGlobalSpring = device.type == DeviceTypes.GPU ? new long[]{ 16, nextMultipleOf(slim.numNodes, dimsLocalSpring[1]) } : new long[] { slim.numNodes };
+				long[] dimsLocalGravity = new long[] { device.getBestBlockSize() };
+				long[] dimsGlobalGravity = new long[] { device.getType() == DeviceTypes.GPU ? nextMultipleOf(slim.numNodes, dimsLocalGravity[0]) : slim.numNodesPadded / 2 };
+				long[] dimsLocalSpring = device.getType() == DeviceTypes.GPU ? new long[] { 16, device.getBestBlockSize() / 16 } : new long[] { 1 };
+				long[] dimsGlobalSpring = device.getType() == DeviceTypes.GPU ? new long[]{ 16, nextMultipleOf(slim.numNodes, dimsLocalSpring[1]) } : new long[] { slim.numNodes };
 		
-				if (device.type == DeviceTypes.GPU) {
+				if (device.getType() == DeviceTypes.GPU) {
 					program.getKernel("CalcForcesGravity").execute(dimsGlobalGravity, dimsLocalGravity,
-						    new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4),
+						    device.createLocalSize(dimsLocalGravity[0] * 4), device.createLocalSize(dimsLocalGravity[0] * 4), device.createLocalSize(dimsLocalGravity[0] * 4),
 						    bufferNodePosX, bufferNodePosY,
 						    bufferNodeMass,
 						    bufferForce,
@@ -450,10 +443,10 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 										slim.numEdgesUnique);
 					
 					program.getKernel("CalcForcesEdgeRepulsion").execute(dimsGlobalGravity, dimsLocalGravity,
-										new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4),	// position
-										new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4),	// tangent
-										new CyCLLocalSize(dimsLocalGravity[0] * 4),												// length
-										new CyCLLocalSize(dimsLocalGravity[0] * 4), new CyCLLocalSize(dimsLocalGravity[0] * 4),	// mass
+										device.createLocalSize(dimsLocalGravity[0] * 4), device.createLocalSize(dimsLocalGravity[0] * 4),	// position
+										device.createLocalSize(dimsLocalGravity[0] * 4), device.createLocalSize(dimsLocalGravity[0] * 4),	// tangent
+										device.createLocalSize(dimsLocalGravity[0] * 4),												// length
+										device.createLocalSize(dimsLocalGravity[0] * 4), device.createLocalSize(dimsLocalGravity[0] * 4),	// mass
 										bufferNodePosX, bufferNodePosY,
 										bufferNodeMass,
 										bufferEdgeStartX, bufferEdgeStartY,
@@ -465,9 +458,9 @@ public class CLLayoutTask extends AbstractParallelPartitionLayoutTask
 										slim.numEdgesUniquePadded);
 				}
 				
-				if (device.type == DeviceTypes.GPU)
+				if (device.getType() == DeviceTypes.GPU)
 					program.getKernel("CalcForcesSpringDrag").execute(dimsGlobalSpring, dimsLocalSpring,
-									    new CyCLLocalSize(dimsLocalSpring[0] * dimsLocalSpring[1] * 2 * 4),
+									    device.createLocalSize(dimsLocalSpring[0] * dimsLocalSpring[1] * 2 * 4),
 									    bufferNodePosX, bufferNodePosY, 
 									    bufferEdges, bufferEdgeOffsets, bufferEdgeCounts,
 									    bufferEdgeCoeffs, bufferEdgeLengths, 

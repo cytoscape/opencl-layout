@@ -28,6 +28,7 @@ package org.cytoscape.opencl.layout;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.cytoscape.cycl.CyCLDevice;
 import org.cytoscape.model.CyNode;
 import org.cytoscape.view.layout.AbstractLayoutAlgorithm;
 import org.cytoscape.view.model.CyNetworkView;
@@ -39,16 +40,18 @@ public class CLLayout extends AbstractLayoutAlgorithm
 {
 	private static final String ALGORITHM_ID = "force-directed-cl";
 	static final String ALGORITHM_DISPLAY_NAME = "Prefuse Force Directed OpenCL Layout";
+  final CyCLDevice device;
 
-	public CLLayout(UndoSupport undo) 
+	public CLLayout(UndoSupport undo, final CyCLDevice device) 
 	{
 		super(ALGORITHM_ID, ALGORITHM_DISPLAY_NAME, undo);
+    this.device = device;
 	}
 
 	@Override
 	public TaskIterator createTaskIterator(CyNetworkView networkView, Object context, Set<View<CyNode>> nodesToLayOut, String attrName) 
 	{
-		return new TaskIterator(new CLLayoutTask(toString(), networkView, nodesToLayOut, (CLLayoutContext)context, attrName, undoSupport));
+		return new TaskIterator(new CLLayoutTask(toString(), device, networkView, nodesToLayOut, (CLLayoutContext)context, attrName, undoSupport));
 	}
 
 	@Override
